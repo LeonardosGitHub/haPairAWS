@@ -1,0 +1,132 @@
+---  
+- name: Initial GSLB cluster build; create, base configuration, cluster configs, ready for production traffic
+  
+  hosts: 127.0.0.1
+  gather_facts: no
+  
+  vars:
+    bigip_password: <passwordHere>   #use secrets manager
+    bigip_username: admin
+    bigip_a_public_mgmt: <publicIP1>
+    bigip_a_external: <IP>
+    bigip_a_internal: <IP>
+    bigip_b_public_mgmt: <publicIP2>
+    bigip_b_external: <IP>
+    bigip_b_internal: <IP>
+    DO_rpm: f5-declarative-onboarding-1.13.0-5.noarch.rpm
+    AS3_rpm: f5-appsvcs-3.20.0-3.noarch.rpm
+
+    provider_a:
+      password: "{{bigip_password}}"
+      server: "{{bigip_a_public_mgmt}}"
+      user: "{{bigip_username}}"
+      validate_certs: no
+      server_port: 443
+
+    provider_b:
+      password: "{{bigip_password}}"
+      server: "{{bigip_b_public_mgmt}}"
+      user: "{{bigip_username}}"
+      validate_certs: no
+      server_port: 443
+
+
+  tasks:
+
+  - name: Waits for port 22 to be available on guests
+    wait_for:
+      host: "{{item}}"
+      port: 22
+      delay: 10
+    with_items:
+      - "{{bigip_a_public_mgmt}}"
+      - "{{bigip_b_public_mgmt}}"
+    delegate_to: localhost
+
+  # - name: Update passwords on both BIG-IPs (Task not working)
+  #   expect:
+  #     command: "ssh -i ~/.ssh/<awsKeyPair> -oStrictHostKeyChecking=no admin@{{item}}"
+  #     timeout: 10
+  #     echo: yes
+  #     responses:
+  #       Warning: ""
+  #       admin@: "modify auth user admin password {{bigip_password}} shell tmsh"
+  #   with_items:
+  #     - "{{bigip_a_public_mgmt}}"
+  #     - "{{bigip_b_public_mgmt}}"
+  #   ignore_errors: yes
+  #   become: no
+  #   delegate_to: localhost
+
+  - name: Wait for BIG-IP-A to be ready for next commands
+    bigip_wait:
+      timeout: 300
+      provider: "{{provider_a}}"
+
+  - name: Wait for BIG-IP-B to be ready for next commands
+    bigip_wait:
+      timeout: 300
+      provider: "{{provider_b}}"
+
+  - name: Install DO to BIG-IP-A
+    bigip_lx_package:
+      package: ~/Documents/BIGIP_iso_AnO_RPMs/AnO/{{DO_rpm}}
+      provider: "{{provider_a}}"
+    delegate_to: localhost
+
+  - name: Install DO to BIG-IP-B
+    bigip_lx_package:
+      package: ~/Documents/BIGIP_iso_AnO_RPMs/AnO/{{DO_rpm}}
+      provider: "{{provider_b}}"
+    delegate_to: localhost
+
+  - name: Install AS3 to BIG-IP-A
+    bigip_lx_package:
+      package: ~/Documents/BIGIP_iso_AnO_RPMs/AnO/{{AS3_rpm}}
+      provider: "{{provider_a}}"
+    delegate_to: localhost
+
+  - name: Install AS3 to BIG-IP-B
+    bigip_lx_package:
+      package: ~/Documents/BIGIP_iso_AnO_RPMs/AnO/{{AS3_rpm}}
+      provider: "{{provider_b}}"
+    delegate_to: localhost
+
+  - name: Deploy DO declaration to BIG-IP-B
+    uri:
+      url: https://{{bigip_b_public_mgmt}}/mgmt/shared/declarative-onboarding
+      url_username: "{{bigip_username}}"
+      url_password: "{{bigip_password}}"
+      force_basic_auth: yes
+      validate_certs: no
+      method: POST
+      body: "{{ lookup('template','configs/DO_template.json') }}"
+      headers:
+        Content-Type: "application/json"
+      force_basic_auth: yes
+      status_code: 202
+      body_format: json
+    delegate_to: localhost
+    vars:
+      internal_selfip: "{{bigip_b_internal}}"
+      external_selfip: "{{bigip_b_external}}"
+
+  - name: Deploy DO declaration to BIG-IP-A
+    uri:
+      url: https://{{bigip_a_public_mgmt}}/mgmt/shared/declarative-onboarding
+      url_username: "{{bigip_username}}"
+      url_password: "{{bigip_password}}"
+      force_basic_auth: yes
+      validate_certs: no
+      method: POST
+      body: "{{ lookup('template','configs/DO_template.json') }}"
+      headers:
+        Content-Type: "application/json"
+      force_basic_auth: yes
+      status_code: 202
+      body_format: json
+    delegate_to: localhost
+    vars:
+      internal_selfip: "{{bigip_a_internal}}"
+      external_selfip: "{{bigip_a_external}}"
+ 

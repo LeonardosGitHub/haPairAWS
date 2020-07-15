@@ -1,0 +1,9 @@
+  - name: Wait for BIG-IP to be available on port 8443 before proceeding < 600seconds
+    wait_for:
+      host: "{{item.value.public_ip}}"
+      port: "8443"
+      timeout: 300
+      #state: started
+    with_dict:
+      - "{{aws}}"
+    delegate_to: localhost

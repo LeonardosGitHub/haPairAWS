@@ -1,0 +1,67 @@
+{
+    "schemaVersion": "1.13.0",
+    "class": "Device",
+    "async": true,
+    "Common": {
+        "class": "Tenant",
+        "external": {
+            "class": "VLAN",
+            "mtu": 1500,
+            "interfaces": [
+                {
+                    "name": "1.1",
+                    "tagged": false
+                }
+            ]
+        },
+        "internal": {
+            "class": "VLAN",
+            "mtu": 1500,
+            "interfaces": [
+                {
+                    "name": "1.2",
+                    "tagged": false
+                }
+            ]
+        },
+        "internal_ip": {
+            "class": "SelfIp",
+            "address": "{{internal_selfip}}/24",
+            "allowService": "default",
+            "vlan": "internal"
+        },
+        "external_ip": {
+            "class": "SelfIp",
+            "address": "{{external_selfip}}/24",
+            "allowService": "default",
+            "vlan": "external"
+        },
+        "configsync": {
+            "class": "ConfigSync",
+            "configsyncIp": "{{internal_selfip}}"
+        },
+        "failoverAddress": {
+            "class": "FailoverUnicast",
+            "address": "{{internal_selfip}}"
+        },
+        "failoverGroup": {
+            "class": "DeviceGroup",
+            "type": "sync-failover",
+            "members": ["{{bigip_a_internal}}", "{{bigip_b_internal}}"],
+            "owner": "/Common/failoverGroup/members/0",
+            "autoSync": true,
+            "saveOnAutoSync": false,
+            "networkFailover": true,
+            "fullLoadOnSync": false,
+            "asmSync": false
+        },
+        "myDeviceTrust": {
+            "class": "DeviceTrust",
+            "localPassword": "{{bigip_password}}",
+            "localUsername": "{{bigip_username}}",
+            "remoteHost": "{{bigip_a_internal}}",
+            "remotePassword": "{{bigip_password}}",
+            "remoteUsername":"{{bigip_username}}"
+        }
+    }
+}

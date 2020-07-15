@@ -1,0 +1,14 @@
+  
+  - name: Remove the **ansible** user from BIG-IP
+    bigip_command:
+      provider:
+        server: "{{item.value.public_ip}}"
+        ssh_keyfile: "~/.ssh/{{item.value.sshkey}}"
+        transport: cli
+        user: admin
+        timeout: 60
+      commands: delete auth user {{bigip_username}}
+      warn: no
+    delegate_to: localhost
+    with_dict: 
+      - "{{aws}}"
